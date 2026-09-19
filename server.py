@@ -186,8 +186,10 @@ def read_bus():
     model = "fast"
     try:
         model = (BUS / ".voice_model").read_text().strip().lower() or "fast"
-        if model not in ("fast", "deep"):
-            model = "fast"
+        if model not in ("haiku", "sonnet", "deep", "fast"):
+            model = "haiku"
+        if model == "fast":
+            model = "haiku"
     except OSError:
         pass
     control_url = "http://127.0.0.1:8792/"

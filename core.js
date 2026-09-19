@@ -280,8 +280,8 @@ const AV = (() => {
       }).catch(() => {});
       return b;
     };
-    [["PAUSE","pause"],["RESUME","resume"],["FAST","fast"],["DEEP","deep"],
-     ["TOGGLE","toggle_model"]].forEach(([t, c]) => bar.appendChild(mk(t, c)));
+    [["PAUSE","pause"],["RESUME","resume"],["HAIKU","haiku"],["SONNET","sonnet"],
+     ["OPUS","deep"],["CYCLE","toggle_model"]].forEach(([t, c]) => bar.appendChild(mk(t, c)));
     let hideT = null;
     addEventListener("mousemove", () => {
       bar.style.opacity = ".85";
