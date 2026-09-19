@@ -71,7 +71,7 @@ const AV = (() => {
     demo: DEMO, shot: SHOT, faces: [],
     _sndOn: true, _mic: false, _readyCbs: [], _ready: false,
   };
-  const BT_CTRL = "http://127.0.0.1:8792";
+  let controlUrl = "http://127.0.0.1:8792";
 
   function dotted(name) {
     const up = String(name).toUpperCase();
@@ -102,6 +102,7 @@ const AV = (() => {
         raw = await r.json();
         A.model = raw.model || "fast";
         A.paused = !!raw.paused || raw.state === "paused";
+        if (raw.control_url) controlUrl = String(raw.control_url).replace(/\/$/, "");
       } catch (e) { /* server gone: hold last state */ }
     }, 120);
   }
@@ -272,7 +273,7 @@ const AV = (() => {
         "letter-spacing:.12em";
       b.onmouseenter = () => { b.style.borderColor = "#3ddc84"; };
       b.onmouseleave = () => { b.style.borderColor = "#1c2f26"; };
-      b.onclick = () => fetch(BT_CTRL + "/api/command", {
+      b.onclick = () => fetch(controlUrl + "/api/command", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cmd }),

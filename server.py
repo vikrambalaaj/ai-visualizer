@@ -190,9 +190,15 @@ def read_bus():
             model = "fast"
     except OSError:
         pass
+    control_url = "http://127.0.0.1:8792/"
+    try:
+        control_url = (BUS / ".voice_control_url").read_text().strip() or control_url
+    except OSError:
+        pass
     return {"state": state, "level": level, "samples": samples,
             "alert": alert, "loading": loading, "rate_limits": rate_limits,
-            "model": model, "paused": state == "paused"}
+            "model": model, "paused": state == "paused",
+            "control_url": control_url}
 
 
 class Handler(BaseHTTPRequestHandler):
