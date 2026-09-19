@@ -24,7 +24,7 @@
    It includes this script, calls AV.init(opts), then reads these
    fields every animation frame after calling AV.tick(dtMs):
 
-     AV.state      "idle" | "listening" | "thinking" | "speaking"
+     AV.state      "idle" | "listening" | "thinking" | "speaking" | "paused"
      AV.level      0..1 raw voice loudness (speaking only)
      AV.env        0..1 smoothed speech envelope (attack/release eased,
                    adaptively normalized — use this for motion)
@@ -67,9 +67,11 @@ const AV = (() => {
     state: "idle", level: 0, env: 0, alert: false, micLevel: 0,
     samples: new Float32Array(64),
     name: "JARVIS", label: "J.A.R.V.I.S.", badge: "",
+    model: "fast", paused: false,
     demo: DEMO, shot: SHOT, faces: [],
     _sndOn: true, _mic: false, _readyCbs: [], _ready: false,
   };
+  const BT_CTRL = "http://127.0.0.1:8792";
 
   function dotted(name) {
     const up = String(name).toUpperCase();
@@ -92,12 +94,14 @@ const AV = (() => {
 
   /* ------------------------------ bus polling ------------------------------ */
   let raw = { state: "idle", level: 0, samples: null, alert: false,
-              loading: false };
+              loading: false, model: "fast", paused: false };
   if (!DEMO) {
     setInterval(async () => {
       try {
         const r = await fetch("/state", { cache: "no-store" });
         raw = await r.json();
+        A.model = raw.model || "fast";
+        A.paused = !!raw.paused || raw.state === "paused";
       } catch (e) { /* server gone: hold last state */ }
     }, 120);
   }
@@ -249,6 +253,45 @@ const AV = (() => {
     };
     paintBtn();
     document.body.appendChild(sndBtn);
+    controlsInit();
+  }
+  function controlsInit() {
+    if (DEMO || SHOT) return;
+    const bar = document.createElement("div");
+    bar.style.cssText =
+      "position:fixed;right:14px;bottom:14px;z-index:50;display:flex;gap:6px;" +
+      "opacity:0;transition:opacity .4s;pointer-events:none;flex-wrap:wrap;" +
+      "justify-content:flex-end;max-width:min(92vw,420px)";
+    const mk = (label, cmd) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.style.cssText =
+        "cursor:pointer;border:1px solid #1c2f26;border-radius:4px;padding:6px 9px;" +
+        "background:#04100a;color:#9fb4ac;font:11px 'SF Mono',Menlo,monospace;" +
+        "letter-spacing:.12em";
+      b.onmouseenter = () => { b.style.borderColor = "#3ddc84"; };
+      b.onmouseleave = () => { b.style.borderColor = "#1c2f26"; };
+      b.onclick = () => fetch(BT_CTRL + "/api/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cmd }),
+      }).catch(() => {});
+      return b;
+    };
+    [["PAUSE","pause"],["RESUME","resume"],["FAST","fast"],["DEEP","deep"],
+     ["TOGGLE","toggle_model"]].forEach(([t, c]) => bar.appendChild(mk(t, c)));
+    let hideT = null;
+    addEventListener("mousemove", () => {
+      bar.style.opacity = ".85";
+      bar.style.pointerEvents = "auto";
+      clearTimeout(hideT);
+      hideT = setTimeout(() => {
+        bar.style.opacity = "0";
+        bar.style.pointerEvents = "none";
+      }, 4000);
+    });
+    document.body.appendChild(bar);
   }
   function paintBtn() {
     if (sndBtn) sndBtn.textContent = A._sndOn ? "SND ON" : "SND OFF";

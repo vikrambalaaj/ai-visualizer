@@ -66,7 +66,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STATES = {"idle", "listening", "thinking", "speaking"}
+STATES = {"idle", "listening", "thinking", "speaking", "paused"}
 WAVEFORM_STALE_S = 0.6
 
 DEFAULTS = {
@@ -183,8 +183,16 @@ def read_bus():
         rate_limits = json.loads((BUS / ".voice_rate_limits").read_text())
     except (OSError, ValueError):
         pass
+    model = "fast"
+    try:
+        model = (BUS / ".voice_model").read_text().strip().lower() or "fast"
+        if model not in ("fast", "deep"):
+            model = "fast"
+    except OSError:
+        pass
     return {"state": state, "level": level, "samples": samples,
-            "alert": alert, "loading": loading, "rate_limits": rate_limits}
+            "alert": alert, "loading": loading, "rate_limits": rate_limits,
+            "model": model, "paused": state == "paused"}
 
 
 class Handler(BaseHTTPRequestHandler):
