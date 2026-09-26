@@ -12,12 +12,13 @@ There is nothing to install. The whole thing is a folder of web pages and one ti
 
 [![ai-visualizer demo video](https://img.youtube.com/vi/6Tb41ORADgs/maxresdefault.jpg)](https://youtu.be/6Tb41ORADgs)
 
-## The four faces
+## The five faces
 
 - **The Circuit Board.** A full-bleed procedural PCB with your agent's name on the center chip. Data pulses stream the traces, components flash as signals hit them, and the whole board reverses flow when it listens to you. Press Space for a live cinematic flythrough of the board while it works.
 - **The Radial.** An 80-bar starburst around a living particle orb, thousands of grains that rotate, churn, and detonate from the core with every syllable. Galaxy backdrop, sonar ripples at idle, radar sweeps while it thinks.
 - **Face in the Code.** Matrix rain that idles like a screensaver, until the agent speaks and a face surfaces inside the glyphs, breathing with the voice. Ships with my AI portrait; drop in `assets/face.png` and the code looks back with yours.
 - **Neural Core.** A constellation brain: nine labeled color islands, a white crescent, traveling thought-pulses, and a CORTEX STATUS panel wired to the real states.
+- **The Ultron Orb.** A 3D holographic cyber sphere inspired by Iron Man & Ultron: layered wireframe shells, inner spiral geodesics, 1,700+ drifting code-text sprites, 250 orbiting satellites, 2,000 volumetric dust particles, dual scanning rings, voice detonation reactivity, and optional MediaPipe webcam hand tracking (pinch-to-spin, dual-pinch-to-zoom).
 
 Every face speaks the same signal bus, so switching faces is just opening a different page. The gallery at the root URL shows all four with one-click demos.
 

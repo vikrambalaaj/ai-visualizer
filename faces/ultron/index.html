@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<!--
+ai-visualizer: give your AI agent a face.
+The Ultron Orb — holographic 3D cyber sphere inspired by Iron Man & Ultron.
+Fusing Three.js wireframe shells, code matrix, voice reactivity, and MediaPipe webcam hand gestures.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ultron Orb</title>
+<style>
+  :root {
+    --amber: #ffaa30;
+    --amber-bright: #ffcc66;
+    --amber-dim: #884400;
+    --amber-bg: rgba(20, 10, 0, 0.65);
+    --amber-border: rgba(255, 170, 48, 0.45);
+    --amber-glow: rgba(255, 170, 48, 0.6);
+    --alert-red: #ff3344;
+    --alert-glow: rgba(255, 50, 70, 0.7);
+    --cyan: #3ddc84;
+    --mono: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: var(--mono);
+    color: var(--amber);
+    user-select: none;
+  }
+
+  #stage-container {
+    position: fixed;
+    inset: 0;
+    cursor: grab;
+    z-index: 1;
+  }
+  #stage-container:active {
+    cursor: grabbing;
+  }
+  #stage-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Overlay Shaders / CRT Filters */
+  .overlay-vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    background: radial-gradient(ellipse at center, transparent 38%, rgba(0, 0, 0, 0.8) 100%);
+  }
+  .overlay-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px;
+    mix-blend-mode: screen;
+  }
+  .overlay-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.2) 2px,
+      rgba(0, 0, 0, 0.2) 4px
+    );
+    opacity: 0.35;
+  }
+
+  /* HUD Corner Brackets */
+  .corner {
+    position: fixed;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--amber-border);
+    pointer-events: none;
+    z-index: 25;
+    transition: border-color 0.3s;
+  }
+  .corner.tl { top: 16px; left: 16px; border-right: none; border-bottom: none; }
+  .corner.tr { top: 16px; right: 16px; border-left: none; border-bottom: none; }
+  .corner.bl { bottom: 16px; left: 16px; border-right: none; border-top: none; }
+  .corner.br { bottom: 16px; right: 16px; border-left: none; border-top: none; }
+
+  /* HUD Overlays */
+  .hud {
+    position: fixed;
+    z-index: 20;
+    color: var(--amber);
+    text-shadow: 0 0 8px var(--amber-glow);
+    transition: opacity 0.4s ease, color 0.3s ease;
+  }
+
+  /* Header (Top Left) */
+  #hud-header {
+    top: 24px;
+    left: 28px;
+    pointer-events: none;
+  }
+  .hud-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .hud-title {
+    font-size: clamp(16px, 1.6vw, 24px);
+    letter-spacing: 0.45em;
+    font-weight: bold;
+    color: var(--amber-bright);
+    text-shadow: 0 0 14px var(--amber-glow);
+  }
+  .hud-model-badge {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 2px 7px;
+    border: 1px solid var(--amber-border);
+    border-radius: 3px;
+    background: rgba(255, 170, 48, 0.08);
+    color: var(--amber);
+  }
+  .hud-subtitle {
+    margin-top: 6px;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: #cca060;
+    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hud-subtitle::after {
+    content: "";
+    display: inline-block;
+    width: 140px;
+    height: 1px;
+    background: linear-gradient(to right, var(--amber-border), transparent);
+  }
+  .hud-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--amber-bright);
+  }
+  .hud-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--amber-bright);
+    box-shadow: 0 0 8px var(--amber);
+    animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.35); opacity: 1; box-shadow: 0 0 12px var(--amber-bright); }
+  }
+
+  /* Telemetry (Top Right) */
+  #hud-telemetry {
+    top: 24px;
+    right: 28px;
+    text-align: right;
+    pointer-events: none;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    line-height: 1.8;
+    color: #cca060;
+  }
+  #hud-clock {
+    font-size: 14px;
+    color: var(--amber-bright);
+    font-weight: bold;
+    letter-spacing: 0.28em;
+    margin-bottom: 4px;
+  }
+  .meter-bar {
+    display: inline-block;
+    width: 70px;
+    height: 5px;
+    background: rgba(255, 170, 48, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .meter-fill {
+    width: 0%;
+    height: 100%;
+    background: var(--amber-bright);
+    box-shadow: 0 0 6px var(--amber);
+    transition: width 0.08s ease;
+  }
+
+  /* Bottom Left (Hints & Usage) */
+  #hud-bottom-left {
+    bottom: 24px;
+    left: 28px;
+    pointer-events: none;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    line-height: 1.8;
+  }
+  .hud-hints {
+    opacity: 0.7;
+    margin-bottom: 8px;
+  }
+  .hud-hints .key {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid var(--amber-border);
+    border-radius: 3px;
+    margin-right: 3px;
+    font-size: 10px;
+    color: var(--amber-bright);
+  }
+  .usage-stat {
+    font-size: 10px;
+    color: #9fb4ac;
+    letter-spacing: 0.18em;
+  }
+  .usage-stat b {
+    color: var(--amber-bright);
+    font-weight: normal;
+  }
+
+  /* Bottom Right (Camera Preview & Controls) */
+  #hud-controls-container {
+    bottom: 24px;
+    right: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 22;
+  }
+
+  /* Camera Preview Panel */
+  .camera-panel {
+    position: relative;
+    width: 208px;
+    height: 156px;
+    display: none;
+    border: 1px solid var(--amber-border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #0a0500;
+    box-shadow: 0 0 16px rgba(255, 140, 20, 0.2);
+  }
+  .camera-panel.visible {
+    display: block;
+  }
+  .camera-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    filter: sepia(1) hue-rotate(-15deg) saturate(2.2) brightness(0.75) contrast(1.15);
+    opacity: 0.85;
+  }
+  .camera-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .camera-status {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 3px 6px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--amber-bright);
+    background: rgba(10, 5, 0, 0.75);
+    border-top: 1px solid rgba(255, 170, 48, 0.3);
+  }
+  .camera-error {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: #ff5533;
+    padding: 4px 8px;
+    background: rgba(40, 10, 10, 0.8);
+    border: 1px solid rgba(255, 80, 50, 0.5);
+    border-radius: 3px;
+    max-width: 208px;
+    text-align: center;
+  }
+
+  /* HUD Buttons */
+  .hud-row {
+    display: flex;
+    gap: 8px;
+  }
+  .hud-btn {
+    min-width: 44px;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--amber-bg);
+    border: 1px solid var(--amber-border);
+    border-radius: 4px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    text-shadow: 0 0 6px var(--amber-glow);
+    box-shadow: 0 0 12px rgba(255, 140, 20, 0.12) inset;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+    user-select: none;
+  }
+  .hud-btn:hover {
+    background: rgba(60, 30, 0, 0.8);
+    border-color: var(--amber-bright);
+    box-shadow: 0 0 14px rgba(255, 150, 30, 0.4), 0 0 12px rgba(255, 140, 20, 0.25) inset;
+    color: var(--amber-bright);
+  }
+  .hud-btn:active {
+    background: rgba(90, 45, 0, 0.9);
+  }
+  .hud-btn[aria-pressed="true"] {
+    background: rgba(140, 70, 0, 0.7);
+    border-color: var(--amber-bright);
+    color: #fff;
+    box-shadow: 0 0 16px rgba(255, 180, 50, 0.5);
+  }
+
+  /* Alert Mode Styling */
+  body.alert-mode {
+    --amber: var(--alert-red);
+    --amber-bright: #ff6677;
+    --amber-dim: #881111;
+    --amber-border: rgba(255, 60, 80, 0.6);
+    --amber-glow: var(--alert-glow);
+  }
+  body.alert-mode .hud-status-dot {
+    background: var(--alert-red);
+    box-shadow: 0 0 10px var(--alert-red);
+  }
+
+  /* Cinematic Mode Hide HUD */
+  body.cine-mode .hud-hints,
+  body.cine-mode .hud-subtitle,
+  body.cine-mode #hud-telemetry {
+    opacity: 0.2;
+    transition: opacity 0.5s ease;
+  }
+
+  @media (max-width: 680px) {
+    .hud-hints { display: none; }
+    #hud-telemetry { display: none; }
+  }
+</style>
+</head>
+<body>
+<!-- 3D WebGL Canvas Container -->
+<div id="stage-container"></div>
+
+<!-- CRT Visual Filters -->
+<div class="overlay-vignette"></div>
+<div class="overlay-grain"></div>
+<div class="overlay-scanlines"></div>
+
+<!-- Corner Frame Markers -->
+<div class="corner tl"></div>
+<div class="corner tr"></div>
+<div class="corner bl"></div>
+<div class="corner br"></div>
+
+<!-- Top Left: Brand & Status -->
+<div id="hud-header" class="hud">
+  <div class="hud-title-row">
+    <div id="agent-title" class="hud-title">JARVIS</div>
+    <div id="model-badge" class="hud-model-badge">HAIKU</div>
+  </div>
+  <div class="hud-subtitle">HOLOGRAPHIC QUANTUM MATRIX // ULTRON ORB</div>
+  <div class="hud-status-badge">
+    <div class="hud-status-dot"></div>
+    <span id="agent-state-label">STANDBY // READY</span>
+  </div>
+</div>
+
+<!-- Top Right: Telemetry & Clock -->
+<div id="hud-telemetry" class="hud">
+  <div id="hud-clock">00:00:00</div>
+  <div>SIGNAL BUS: <span id="bus-state" style="color:var(--amber-bright)">LINKED</span></div>
+  <div>VOICE LEVEL: <span class="meter-bar"><span id="audio-meter" class="meter-fill"></span></span></div>
+  <div>ROTATION: <span id="telemetry-rot">LOCKED</span></div>
+</div>
+
+<!-- Bottom Left: Keyboard Hints & Token Usage -->
+<div id="hud-bottom-left" class="hud">
+  <div class="hud-hints">
+    <span class="key">DRAG</span> spin &nbsp;
+    <span class="key">SCROLL</span> zoom &nbsp;
+    <span class="key">G</span> gestures &nbsp;
+    <span class="key">R</span> reset &nbsp;
+    <span class="key">+/−</span> zoom &nbsp;
+    <span class="key">SPACE</span> cine &nbsp;
+    <span class="key">F</span> full
+  </div>
+  <div id="usage-container"></div>
+</div>
+
+<!-- Bottom Right: Camera Preview Panel & Controls -->
+<div id="hud-controls-container" class="hud">
+  <div id="camera-panel" class="camera-panel">
+    <video id="webcam-video" muted playsinline class="camera-video"></video>
+    <canvas id="landmarks-canvas" width="208" height="156" class="camera-overlay"></canvas>
+    <div id="camera-status" class="camera-status">STANDBY // SHOW HANDS</div>
+  </div>
+  <div id="camera-error" class="camera-error" style="display:none;"></div>
+
+  <div class="hud-row">
+    <button type="button" id="btn-gestures" class="hud-btn" aria-pressed="false">
+      GESTURES OFF
+    </button>
+  </div>
+  <div class="hud-row">
+    <button type="button" id="btn-zoom-in" class="hud-btn" aria-label="Zoom in">+</button>
+    <button type="button" id="btn-zoom-out" class="hud-btn" aria-label="Zoom out">−</button>
+    <button type="button" id="btn-reset" class="hud-btn" aria-label="Reset view">RESET</button>
+    <button type="button" id="btn-cine" class="hud-btn" aria-label="Cinematic mode">CINE</button>
+  </div>
+</div>
+
+<!-- Core Signal Bus & Ultron Three.js Engine -->
+<script src="../../core.js"></script>
+<script src="ultron.bundle.js"></script>
+
+<script>
+"use strict";
+
+const Q = new URLSearchParams(location.search);
+const SHOT = Q.get("shot");
+
+// Initialize signal bus
+AV.init({ mic: true, sound: true });
+
+// DOM Elements
+const stageContainer = document.getElementById("stage-container");
+const agentTitle = document.getElementById("agent-title");
+const modelBadge = document.getElementById("model-badge");
+const agentStateLabel = document.getElementById("agent-state-label");
+const hudClock = document.getElementById("hud-clock");
+const audioMeter = document.getElementById("audio-meter");
+const busState = document.getElementById("bus-state");
+const telemetryRot = document.getElementById("telemetry-rot");
+const usageContainer = document.getElementById("usage-container");
+const cameraPanel = document.getElementById("camera-panel");
+const cameraVideo = document.getElementById("webcam-video");
+const landmarksCanvas = document.getElementById("landmarks-canvas");
+const cameraStatus = document.getElementById("camera-status");
+const cameraError = document.getElementById("camera-error");
+const btnGestures = document.getElementById("btn-gestures");
+const btnZoomIn = document.getElementById("btn-zoom-in");
+const btnZoomOut = document.getElementById("btn-zoom-out");
+const btnReset = document.getElementById("btn-reset");
+const btnCine = document.getElementById("btn-cine");
+
+// Initialize Ultron 3D Scene
+let sceneApi = null;
+if (window.Ultron && window.Ultron.createOrbScene) {
+  sceneApi = window.Ultron.createOrbScene(stageContainer);
+}
+
+// Hand tracker instance
+let tracker = null;
+let cameraActive = false;
+
+AV.ready(a => {
+  document.title = (a.name || "Jarvis") + " — The Ultron Orb";
+  agentTitle.textContent = (a.label || a.name || "JARVIS").toUpperCase();
+});
+
+// Clock tick
+function updateClock() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  hudClock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Gestures toggle logic
+const MODE_MAP = {
+  idle: "SHOW HANDS",
+  spin: "PINCH DRAG // SPIN",
+  zoom: "DUAL PINCH // ZOOM",
+};
+
+async function startGestures() {
+  if (cameraActive || !window.Ultron?.HandTracker) return;
+  btnGestures.textContent = "INITIALIZING…";
+  btnGestures.disabled = true;
+  cameraError.style.display = "none";
+
+  tracker = new window.Ultron.HandTracker(cameraVideo, landmarksCanvas, {
+    onRotate: (dt, dp) => sceneApi?.rotateBy(dt, dp),
+    onZoom: factor => sceneApi?.zoomBy(factor),
+    onStatus: s => {
+      if (s.hands > 0) {
+        cameraStatus.textContent = `${s.hands} HAND${s.hands > 1 ? "S" : ""} · ${MODE_MAP[s.mode] || s.mode.toUpperCase()}`;
+      } else {
+        cameraStatus.textContent = "SHOW HANDS";
+      }
+    },
+  });
+
+  try {
+    await tracker.start();
+    cameraActive = true;
+    btnGestures.textContent = "GESTURES ON";
+    btnGestures.setAttribute("aria-pressed", "true");
+    btnGestures.disabled = false;
+    cameraPanel.classList.add("visible");
+  } catch (err) {
+    tracker.stop();
+    tracker = null;
+    cameraActive = false;
+    btnGestures.textContent = "GESTURES OFF";
+    btnGestures.setAttribute("aria-pressed", "false");
+    btnGestures.disabled = false;
+    cameraPanel.classList.remove("visible");
+    cameraError.style.display = "block";
+    cameraError.textContent =
+      err instanceof DOMException && err.name === "NotAllowedError"
+        ? "CAMERA ACCESS DENIED"
+        : "GESTURE TRACKER FAILED";
+  }
+}
+
+function stopGestures() {
+  if (!tracker) return;
+  tracker.stop();
+  tracker = null;
+  cameraActive = false;
+  btnGestures.textContent = "GESTURES OFF";
+  btnGestures.setAttribute("aria-pressed", "false");
+  cameraPanel.classList.remove("visible");
+}
+
+function toggleGestures() {
+  if (cameraActive) stopGestures();
+  else void startGestures();
+}
+
+btnGestures.addEventListener("click", toggleGestures);
+btnZoomIn.addEventListener("click", () => sceneApi?.zoomIn());
+btnZoomOut.addEventListener("click", () => sceneApi?.zoomOut());
+btnReset.addEventListener("click", () => sceneApi?.resetView());
+btnCine.addEventListener("click", () => {
+  const isCine = sceneApi?.toggleCinematic();
+  btnCine.setAttribute("aria-pressed", isCine ? "true" : "false");
+  document.body.classList.toggle("cine-mode", !!isCine);
+  telemetryRot.textContent = isCine ? "CINEMATIC" : "MANUAL";
+});
+
+// Keyboard controls
+addEventListener("keydown", e => {
+  switch (e.key) {
+    case "g":
+    case "G":
+      toggleGestures();
+      break;
+    case "r":
+    case "R":
+      sceneApi?.resetView();
+      break;
+    case "+":
+    case "=":
+      sceneApi?.zoomIn();
+      break;
+    case "-":
+    case "_":
+      sceneApi?.zoomOut();
+      break;
+    case " ":
+      e.preventDefault();
+      {
+        const isCine = sceneApi?.toggleCinematic();
+        btnCine.setAttribute("aria-pressed", isCine ? "true" : "false");
+        document.body.classList.toggle("cine-mode", !!isCine);
+        telemetryRot.textContent = isCine ? "CINEMATIC" : "MANUAL";
+      }
+      break;
+    case "f":
+    case "F":
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+      break;
+  }
+});
+
+// Live telemetry & usage readout
+function updateUsage() {
+  const rows = AV.util?.usageRows ? AV.util.usageRows() : [];
+  if (!rows || !rows.length) {
+    usageContainer.innerHTML = "";
+    return;
+  }
+  let html = "";
+  for (const r of rows) {
+    html += `<div class="usage-stat">${r.label}: <b style="${r.hot ? 'color:#ff5533' : ''}">${r.text}</b></div>`;
+  }
+  usageContainer.innerHTML = html;
+}
+
+// State labels lookup
+const STATE_DESCS = {
+  idle: "STANDBY // IDLE",
+  listening: "SENSING // LISTENING",
+  thinking: "SYNTHESIZING // THINKING",
+  speaking: "TRANSMITTING // ACTIVE",
+  paused: "SYSTEM // PAUSED",
+};
+
+// Main Frame loop updates HUD
+let lastT = performance.now();
+function frame(dt) {
+  AV.tick(dt);
+
+  // State styling & description
+  const state = AV.state || "idle";
+  agentStateLabel.textContent = STATE_DESCS[state] || state.toUpperCase();
+
+  // Model indicator
+  if (AV.model) {
+    modelBadge.textContent = AV.model.toUpperCase();
+  }
+
+  // Audio level meter
+  const meterVal = state === "speaking" ? AV.env : (state === "listening" ? (AV.micLevel || 0) : 0);
+  audioMeter.style.width = Math.min(100, Math.round(meterVal * 100)) + "%";
+
+  // Alert class toggle
+  document.body.classList.toggle("alert-mode", !!AV.alert);
+  if (AV.alert) {
+    agentStateLabel.textContent = "CRITICAL ALERT // INTERCEPT";
+  }
+
+  // Periodically refresh usage stats
+  updateUsage();
+}
+
+if (SHOT) {
+  AV.shotRun(frame);
+} else {
+  (function loop(ts) {
+    const dt = Math.min(100, ts - lastT);
+    lastT = ts;
+    frame(dt);
+    requestAnimationFrame(loop);
+  })(performance.now());
+}
+</script>
+</body>
+</html>
